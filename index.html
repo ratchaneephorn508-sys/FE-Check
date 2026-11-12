@@ -130,7 +130,8 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px soli
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
-const START = <?!= JSON.stringify(startId) ?>;
+const START = new URLSearchParams(window.location.search).get('id') || '';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzD6G6SRiOVvVrEWOZUuLs37Twl3xW9PZragAaikZeyuNJmRkGiEGR0PQc6WL1lkS2hcA/exec';
 const ITEMS = [
   ['Gauge','เข็มเกจอยู่ในโซนสีเขียว'],
   ['PinSeal','สลักและซีลครบ'],
@@ -143,6 +144,77 @@ const LABEL = {ok:'ปกติ',soon:'ใกล้ครบกำหนด',ove
 const isCO2 = x => /co2|co₂/i.test(String(x && x.type));
 const VIEWS = ['home','form','admin','qr'];
 let DATA = {list:[],counts:{},role:'',appUrl:''}, cur = null, answers = {}, photo = '', editing = null;
+
+// ส่งคำสั่งไปยัง Google Apps Script ผ่านฟอร์ม POST และ iframe
+// จัดคิวคำขอเพื่อป้องกันการตอบกลับสลับกัน
+let gasQueue = Promise.resolve();
+
+function gasRequest(action, fields = {}) {
+  const run = () => new Promise((resolve, reject) => {
+    const frame = document.createElement('iframe');
+    const frameName = 'fe_check_gas_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    frame.name = frameName;
+    frame.style.display = 'none';
+
+    let finished = false;
+    const cleanup = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      window.removeEventListener('message', onMessage);
+      frame.remove();
+    };
+
+    const onMessage = event => {
+      if (event.source !== frame.contentWindow) return;
+      const result = event.data;
+      cleanup();
+
+      if (!result || typeof result !== 'object') {
+        reject(new Error('ได้รับคำตอบจาก Apps Script ไม่ถูกต้อง'));
+      } else if (!result.ok) {
+        reject(new Error(result.error || 'Apps Script ทำงานไม่สำเร็จ'));
+      } else {
+        resolve(result.data);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error('หมดเวลารอคำตอบจาก Apps Script กรุณาตรวจสอบการ Deploy และสิทธิ์การเข้าถึง'));
+    }, 45000);
+
+    window.addEventListener('message', onMessage);
+    document.body.appendChild(frame);
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = GAS_URL;
+    form.target = frameName;
+    form.style.display = 'none';
+
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'payload';
+    input.value = JSON.stringify({action, ...fields});
+    form.appendChild(input);
+    document.body.appendChild(form);
+
+    try {
+      form.submit();
+      form.remove();
+    } catch (error) {
+      cleanup();
+      form.remove();
+      reject(error);
+    }
+  });
+
+  const request = gasQueue.then(run, run);
+  gasQueue = request.catch(() => {});
+  return request;
+}
+
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -155,10 +227,12 @@ function show(v, title) {
 function showHome() { cur = null; show('home'); load(); }
 
 function load() {
-  google.script.run.withSuccessHandler(d => {
+  gasRequest('getData').then(d => {
     DATA = d; renderHome();
     if (START && !cur && !window.__started) { window.__started = true; openId(START); }
-  }).withFailureHandler(e => { $('list').innerHTML = '<div class="msg err">' + esc(e.message) + '</div>'; }).api_getData();
+  }).catch(e => {
+    $('list').innerHTML = '<div class="msg err">' + esc(e.message) + '</div>';
+  });
 }
 
 let FILTER = 'all';
@@ -210,10 +284,10 @@ function openId(raw) {
   $('saveBtn').disabled = false; $('saveBtn').textContent = 'บันทึกผลตรวจ';
   $('hist').innerHTML = '<p class="meta">กำลังโหลด...</p>';
   show('form', 'ฟอร์มตรวจสอบ');
-  google.script.run.withSuccessHandler(h => {
+  gasRequest('history', {id: x.id}).then(h => {
     $('hist').innerHTML = h.map(r => '<div class="hist"><b>' + esc(r.result) + '</b> ' + esc(r.dt) +
       '<small>' + esc(r.by) + (r.weight ? ' • ' + esc(r.weight) + ' กก.' : '') + (r.remark ? ' • ' + esc(r.remark) : '') + '</small></div>').join('') || '<p class="meta">ยังไม่เคยตรวจ</p>';
-  }).withFailureHandler(() => { $('hist').innerHTML = ''; }).api_history(x.id);
+  }).catch(() => { $('hist').innerHTML = ''; });
 }
 
 function ans(k, v) {
@@ -239,14 +313,14 @@ function save() {
   if (ITEMS.some(([k]) => !answers[k])) { $('fMsg').innerHTML = '<div class="msg err">กรุณาตรวจให้ครบทุกข้อ</div>'; return; }
   if (isCO2(cur) && !$('weight').value.trim()) { $('fMsg').innerHTML = '<div class="msg err">กรุณากรอกน้ำหนักที่ชั่งได้</div>'; return; }
   $('saveBtn').disabled = true; $('saveBtn').textContent = 'กำลังบันทึก...';
-  google.script.run.withSuccessHandler(r => {
+  gasRequest('submit', {data: {id: cur.id, items: answers, photo: photo, remark: $('remark').value, weight: $('weight').value}}).then(r => {
     $('fMsg').innerHTML = '<div class="msg ' + (r.pass ? 'good' : 'err') + '">' +
       (r.pass ? 'บันทึกแล้ว: ผ่านทุกข้อ ตรวจครั้งถัดไป ' + esc(r.next) : 'บันทึกแล้ว: มีข้อไม่ผ่าน ระบบแจ้งแอดมินทางอีเมลแล้ว') + '</div>';
     $('saveBtn').textContent = 'บันทึกแล้ว';
-  }).withFailureHandler(e => {
+  }).catch(e => {
     $('fMsg').innerHTML = '<div class="msg err">' + esc(e.message) + '</div>';
     $('saveBtn').disabled = false; $('saveBtn').textContent = 'บันทึกผลตรวจ';
-  }).api_submit({id: cur.id, items: answers, photo: photo, remark: $('remark').value, weight: $('weight').value});
+  });
 }
 
 /* ----- แอดมิน: เพิ่ม/แก้ไขถัง ----- */
@@ -267,15 +341,15 @@ function openAdmin(id) {
 
 function saveExt() {
   $('aBtn').disabled = true;
-  google.script.run.withSuccessHandler(r => {
-    google.script.run.withSuccessHandler(d => {
+  gasRequest('saveExtinguisher', {data: {oldId: editing || '', id: $('aId').value, type: $('aType').value, size: $('aSize').value,
+    location: $('aLoc').value, installed: $('aDate').value}}).then(r => {
+    return gasRequest('getData').then(d => {
       DATA = d; openAdmin(null);
       $('aMsg').innerHTML = '<div class="msg good">' + (r.created ? 'เพิ่มถังแล้ว' : r.renamed ? 'เปลี่ยนรหัสและแก้ไขข้อมูลแล้ว' : 'แก้ไขข้อมูลแล้ว') + '</div>';
-    }).api_getData();
-  }).withFailureHandler(e => {
+    });
+  }).catch(e => {
     $('aMsg').innerHTML = '<div class="msg err">' + esc(e.message) + '</div>'; $('aBtn').disabled = false;
-  }).api_saveExtinguisher({oldId: editing || '', id: $('aId').value, type: $('aType').value, size: $('aSize').value,
-    location: $('aLoc').value, installed: $('aDate').value});
+  });
 }
 
 let armed = false, armTimer = null;
@@ -290,29 +364,29 @@ function delExt() {
     return;
   }
   clearTimeout(armTimer); b.disabled = true;
-  google.script.run.withSuccessHandler(r => {
-    google.script.run.withSuccessHandler(d => {
+  gasRequest('deleteExtinguisher', {id: editing}).then(r => {
+    return gasRequest('getData').then(d => {
       DATA = d; openAdmin(null);
       $('aMsg').innerHTML = '<div class="msg good">ลบถัง ' + esc(r.deleted) + ' แล้ว</div>';
-    }).api_getData();
-  }).withFailureHandler(e => {
+    });
+  }).catch(e => {
     $('aMsg').innerHTML = '<div class="msg err">' + esc(e.message) + '</div>'; b.disabled = false;
     armed = false; b.classList.remove('arm'); b.textContent = 'ลบถังนี้';
-  }).api_deleteExtinguisher(editing);
+  });
 }
 
 /* ----- พิมพ์ QR ----- */
 function openQR() {
   show('qr', 'พิมพ์ QR');
   $('labels').innerHTML = ''; $('qrMsg').innerHTML = '';
-  if (!DATA.appUrl) { $('qrMsg').innerHTML = '<div class="msg err">ยังไม่พบลิงก์เว็บแอป ต้อง Deploy เป็นเว็บแอปก่อน</div>'; return; }
   if (typeof QRCode === 'undefined') { $('qrMsg').innerHTML = '<div class="msg err">โหลดตัวสร้าง QR ไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองใหม่</div>'; return; }
   if (!DATA.list.length) { $('qrMsg').innerHTML = '<div class="msg err">ยังไม่มีถังให้พิมพ์ QR</div>'; return; }
   DATA.list.forEach(x => {
     const d = document.createElement('div'); d.className = 'lab';
     d.innerHTML = '<div class="qr"></div><b>' + esc(x.id) + '</b><small>' + esc(x.location) + '</small>';
     $('labels').appendChild(d);
-    new QRCode(d.querySelector('.qr'), {text: DATA.appUrl + '?id=' + encodeURIComponent(x.id), width: 140, height: 140, correctLevel: QRCode.CorrectLevel.M});
+    const pageUrl = window.location.origin + window.location.pathname + '?id=' + encodeURIComponent(x.id);
+    new QRCode(d.querySelector('.qr'), {text: pageUrl, width: 140, height: 140, correctLevel: QRCode.CorrectLevel.M});
   });
 }
 
