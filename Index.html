@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#EFF0EC;--ink:#1B2430;--mute:#5B6573;--line:#CDD1CB;--card:#FFFFFF;--red:#C62828;--green:#1E7F4F;--amber:#B87500;--blue:#2C5C8A}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 'IBM Plex Sans Thai',system-ui,sans-serif}
+header{background:var(--red);color:#fff;padding:14px 16px;position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:12px}
+header h1{font-size:18px;margin:0;font-weight:700;flex:1}
+header button{background:transparent;border:2px solid #fff;color:#fff;border-radius:8px;padding:6px 12px;font:inherit;font-weight:600}
+main{max-width:600px;margin:0 auto;padding:16px}
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
+.tile{background:var(--card);border:0;border-left:6px solid var(--line);padding:10px 12px;border-radius:6px;text-align:left;font:inherit;color:inherit;width:100%;cursor:pointer}
+.tile.on{outline:3px solid var(--ink);outline-offset:1px}
+.tile b{display:block;font-size:28px;line-height:1.1}
+.tile span{color:var(--mute);font-size:14px}
+.t-ok{border-color:var(--green)}.t-soon{border-color:var(--amber)}.t-bad{border-color:var(--red)}.t-due{border-color:var(--blue)}
+@media(min-width:520px){.tiles{grid-template-columns:repeat(4,1fr)}}
+#listHead{scroll-margin-top:72px;display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+#listHead:empty{display:none}
+.link{background:none;border:0;color:var(--blue);font:inherit;font-weight:700;text-decoration:underline;padding:8px 0;min-height:40px}
+.find,.bar{display:flex;gap:8px;margin-bottom:12px}
+input[type=text],input[type=date],textarea{width:100%;padding:12px;border:2px solid var(--line);border-radius:8px;font:inherit;background:#fff;color:var(--ink)}
+.btn{background:var(--ink);color:#fff;border:0;border-radius:8px;padding:12px 18px;font:inherit;font-weight:700;min-height:48px}
+.btn.danger{width:100%;margin-top:10px;background:#fff;color:var(--red);border:2px solid var(--red)}
+.btn.danger.arm{background:var(--red);color:#fff}
+.btn.alt{background:#fff;color:var(--ink);border:2px solid var(--ink)}
+.btn.big{width:100%;background:var(--red);font-size:18px;min-height:56px;margin-top:16px}
+.btn:disabled{opacity:.5}
+.bar .btn{flex:1}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--card);padding:12px;border-radius:6px;margin-bottom:8px;border:0;width:100%;text-align:left;font:inherit;color:inherit}
+.row small,.hist small{color:var(--mute);display:block}
+.chip{font-size:13px;font-weight:700;padding:3px 10px;border-radius:99px;color:#fff;white-space:nowrap}
+.c-ok{background:var(--green)}.c-soon{background:var(--amber)}.c-overdue,.c-fail{background:var(--red)}.c-due{background:var(--blue)}
+h2{font-size:20px;margin:4px 0 2px}h3{font-size:16px;margin:20px 0 8px}
+.meta{color:var(--mute);margin:0 0 14px}
+.item{background:var(--card);border-radius:6px;padding:10px 12px;margin-bottom:8px}
+.item p{margin:0 0 8px;font-weight:600}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.seg button{padding:12px;border:2px solid var(--line);background:#fff;border-radius:8px;font:inherit;font-weight:700;color:var(--ink);min-height:48px}
+.seg button.p.on{background:var(--green);border-color:var(--green);color:#fff}
+.seg button.f.on{background:var(--red);border-color:var(--red);color:#fff}
+.photo img{max-width:100%;border-radius:6px;margin-top:8px;display:block}
+.msg{padding:12px;border-radius:6px;margin:12px 0;font-weight:600}
+.msg.err{background:#FBE3E1;color:#8E1B1B}.msg.good{background:#DDF0E5;color:#145A38}
+.hist{background:var(--card);border-radius:6px;padding:8px 12px;margin-bottom:6px}
+label{display:block;font-weight:600;margin:12px 0 4px}
+.labels{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.lab{background:#fff;border:2px solid var(--ink);padding:10px;text-align:center;break-inside:avoid}
+.lab div.qr{display:flex;justify-content:center;margin-bottom:6px}
+.lab b{display:block;font-size:18px}.lab small{color:var(--mute)}
+.hide{display:none}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+@media print{header,#home,#form,#admin,.noprint{display:none!important}body{background:#fff}.labels{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+<header><h1 id="title">ตรวจถังดับเพลิง</h1><button id="back" class="hide" onclick="showHome()">กลับ</button></header>
+<main>
+  <section id="home">
+    <div class="tiles" id="tiles"></div>
+    <div class="find">
+      <input type="text" id="idIn" placeholder="พิมพ์รหัสถัง เช่น SB-FE-001" autocapitalize="characters">
+      <button class="btn" onclick="openId(document.getElementById('idIn').value)">เปิด</button>
+    </div>
+    <div class="bar hide" id="adminBar">
+      <button class="btn alt" onclick="openAdmin(null)">เพิ่ม/แก้ไขถัง</button>
+      <button class="btn alt" onclick="openQR()">พิมพ์ QR</button>
+    </div>
+    <p class="meta">สแกน QR ที่ตัวถังด้วยกล้องมือถือ ระบบจะเปิดฟอร์มของถังนั้นให้</p>
+    <div id="listHead"></div>
+    <div id="list"></div>
+  </section>
+
+  <section id="form" class="hide">
+    <h2 id="fId"></h2>
+    <p class="meta" id="fMeta"></p>
+    <div class="item hide" id="wBox">
+      <p>น้ำหนักที่ชั่งได้ (กก.)</p>
+      <input type="text" id="weight" inputmode="decimal" maxlength="8" placeholder="เช่น 14.2">
+      <small class="meta">ชั่งทั้งถัง แล้วนำน้ำหนักที่ได้ไปเทียบกับน้ำหนักที่ระบุไว้ข้างถังหรือบนป้ายถัง จากนั้นเลือกผ่านหรือไม่ผ่านในข้อแรกด้านล่าง</small>
+    </div>
+    <div id="items"></div>
+    <div class="item photo">
+      <p>รูปถ่ายถัง</p>
+      <input type="file" id="photoIn" accept="image/*" capture="environment">
+      <img id="prev" class="hide" alt="ตัวอย่างรูป">
+    </div>
+    <div class="item"><p>หมายเหตุ</p><textarea id="remark" rows="3" maxlength="500"></textarea></div>
+    <div id="fMsg"></div>
+    <button class="btn big" id="saveBtn" onclick="save()">บันทึกผลตรวจ</button>
+    <h3>ประวัติการตรวจล่าสุด</h3>
+    <div id="hist"></div>
+  </section>
+
+  <section id="admin" class="hide">
+    <h2 id="aTitle">เพิ่มถังใหม่</h2>
+    <label for="aId">รหัสถัง (ใช้ A-Z, 0-9, -)</label><input type="text" id="aId" maxlength="30" autocapitalize="characters">
+    <label for="aType">ชนิด</label><input type="text" id="aType" list="types" maxlength="80">
+    <datalist id="types"><option>เคมีแห้งทั่วไป</option><option>CO2</option><option>สารเคมีชนิดพิเศษ</option><option>คผงเคมีโซเดียมคลอไรด์</option><option>
+</option></datalist>
+    <label for="aSize">ขนาด</label>
+<input type="text" id="aSize" list="sizes" maxlength="80" placeholder="เช่น 15 lb">
+<datalist id="sizes">
+  <option value="15 lb">
+  <option value="10 lb">
+</datalist>
+    <label for="aLoc">ตำแหน่งที่ติดตั้ง</label><input type="text" id="aLoc" maxlength="80">
+    <label for="aDate">วันที่ติดตั้งถัง</label><input type="date" id="aDate">
+    <div id="aMsg"></div>
+    <button class="btn big" id="aBtn" onclick="saveExt()">บันทึกข้อมูลถัง</button>
+    <button class="btn danger hide" id="aDel" onclick="delExt()">ลบถังนี้</button>
+    <h3>เลือกถังเพื่อแก้ไข</h3>
+    <div id="aList"></div>
+  </section>
+
+  <section id="qr" class="hide">
+    <div class="noprint">
+      <h2>พิมพ์ QR ติดถัง</h2>
+      <p class="meta">QR แต่ละอันเปิดฟอร์มตรวจของถังนั้น ควรเขียนรหัสถังด้วยปากกาไว้ข้าง QR เผื่อสแกนไม่ติด</p>
+      <button class="btn" onclick="window.print()">พิมพ์</button>
+      <div id="qrMsg"></div>
+    </div>
+    <div class="labels" id="labels"></div>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+const START = <?!= JSON.stringify(startId) ?>;
+const ITEMS = [
+  ['Gauge','เข็มเกจอยู่ในโซนสีเขียว'],
+  ['PinSeal','สลักและซีลครบ'],
+  ['HoseNozzle','สายและหัวฉีดไม่แตกชำรุด'],
+  ['Body','ตัวถังไม่บุบ ไม่เป็นสนิม'],
+  ['Label','ป้ายและฉลากชัดเจน'],
+  ['Access','ตำแหน่งเข้าถึงง่าย ไม่มีของกีดขวาง']
+];
+const LABEL = {ok:'ปกติ',soon:'ใกล้ครบกำหนด',overdue:'เกินกำหนด',due:'ยังไม่เคยตรวจ',fail:'ไม่ผ่าน'};
+const isCO2 = x => /co2|co₂/i.test(String(x && x.type));
+const VIEWS = ['home','form','admin','qr'];
+let DATA = {list:[],counts:{},role:'',appUrl:''}, cur = null, answers = {}, photo = '', editing = null;
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function show(v, title) {
+  VIEWS.forEach(x => $(x).classList.toggle('hide', x !== v));
+  $('back').classList.toggle('hide', v === 'home');
+  $('title').textContent = title || 'ตรวจถังดับเพลิง';
+  window.scrollTo(0, 0);
+}
+function showHome() { cur = null; show('home'); load(); }
+
+function load() {
+  google.script.run.withSuccessHandler(d => {
+    DATA = d; renderHome();
+    if (START && !cur && !window.__started) { window.__started = true; openId(START); }
+  }).withFailureHandler(e => { $('list').innerHTML = '<div class="msg err">' + esc(e.message) + '</div>'; }).api_getData();
+}
+
+let FILTER = 'all';
+const TILES = [['all','ถังทั้งหมด',''],['ok','ปกติ','t-ok'],['todo','ยังไม่ตรวจ','t-soon'],['fail','ไม่ผ่าน','t-bad']];
+// ปกติ = ตรวจแล้วและยังไม่เกินกำหนด (รวมใกล้ครบกำหนด) | ยังไม่ตรวจ = ยังไม่เคยตรวจ หรือเกินกำหนดตรวจ
+const GROUPS = {ok:['ok','soon'], todo:['due','overdue'], fail:['fail']};
+const countOf = (c, k) => k === 'all' ? c.total : GROUPS[k].reduce((n, st) => n + c[st], 0);
+
+function setFilter(f) {
+  FILTER = (FILTER === f) ? 'all' : f;
+  renderHome();
+  if (FILTER !== 'all') $('listHead').scrollIntoView();
+}
+
+function renderHome() {
+  const c = DATA.counts;
+  $('adminBar').classList.toggle('hide', DATA.role !== 'admin');
+  $('tiles').innerHTML = TILES.map(([k, t, cls]) =>
+    '<button class="tile ' + cls + (FILTER === k ? ' on' : '') + '" aria-pressed="' + (FILTER === k) + '" onclick="setFilter(\'' + k + '\')">' +
+    '<b>' + countOf(c, k) + '</b><span>' + t + '</span></button>').join('');
+  const order = {fail:0, overdue:1, due:2, soon:3, ok:4};
+  const shown = DATA.list.filter(x => FILTER === 'all' || GROUPS[FILTER].includes(x.status))
+    .sort((a, b) => order[a.status] - order[b.status]);
+  const name = TILES.find(t => t[0] === FILTER)[1];
+  $('listHead').innerHTML = FILTER === 'all' ? '' :
+    '<b>' + name + ' ' + shown.length + ' ถัง</b><button class="link" onclick="setFilter(\'all\')">แสดงทั้งหมด</button>';
+  $('list').innerHTML = shown.map(x =>
+    '<button class="row" onclick="openId(\'' + esc(x.id) + '\')"><span><b>' + esc(x.id) + '</b> ' + esc(x.type) +
+    '<small>' + esc(x.location) + (x.next ? ' • ครบ ' + esc(x.next) : '') + '</small></span>' +
+    '<span class="chip c-' + x.status + '">' + LABEL[x.status] + '</span></button>').join('')
+    || (FILTER !== 'all' ? '<p class="meta">ไม่มีถังในกลุ่มนี้</p>'
+        : '<p class="meta">ยังไม่มีข้อมูลถัง' + (DATA.role === 'admin' ? ' กด "เพิ่ม/แก้ไขถัง" เพื่อเริ่มเพิ่ม' : ' ติดต่อแอดมินเพื่อเพิ่มถัง') + '</p>');
+}
+
+/* ----- ฟอร์มตรวจ ----- */
+function openId(raw) {
+  const id = String(raw || '').trim().toUpperCase();
+  const x = DATA.list.find(e => e.id.toUpperCase() === id);
+  if (!x) { alert('ไม่พบรหัสถัง: ' + id); return; }
+  cur = x; answers = {}; photo = '';
+  $('fId').textContent = x.id;
+  $('fMeta').textContent = [x.type, x.size].filter(Boolean).join(' ') + ' • ' + x.location + (x.last ? ' • ตรวจล่าสุด ' + x.last : '');
+  $('wBox').classList.toggle('hide', !isCO2(x)); $('weight').value = '';
+  $('items').innerHTML = ITEMS.map(([k, t]) =>
+    '<div class="item"><p>' + (k === 'Gauge' && isCO2(x) ? 'น้ำหนักตรงตามที่ระบุข้างถัง' : t) + '</p><div class="seg">' +
+    '<button class="p" data-k="' + k + '" onclick="ans(\'' + k + '\',\'P\')">ผ่าน</button>' +
+    '<button class="f" data-k="' + k + '" onclick="ans(\'' + k + '\',\'F\')">ไม่ผ่าน</button></div></div>').join('');
+  $('remark').value = ''; $('photoIn').value = ''; $('prev').classList.add('hide'); $('fMsg').innerHTML = '';
+  $('saveBtn').disabled = false; $('saveBtn').textContent = 'บันทึกผลตรวจ';
+  $('hist').innerHTML = '<p class="meta">กำลังโหลด...</p>';
+  show('form', 'ฟอร์มตรวจสอบ');
+  google.script.run.withSuccessHandler(h => {
+    $('hist').innerHTML = h.map(r => '<div class="hist"><b>' + esc(r.result) + '</b> ' + esc(r.dt) +
+      '<small>' + esc(r.by) + (r.weight ? ' • ' + esc(r.weight) + ' กก.' : '') + (r.remark ? ' • ' + esc(r.remark) : '') + '</small></div>').join('') || '<p class="meta">ยังไม่เคยตรวจ</p>';
+  }).withFailureHandler(() => { $('hist').innerHTML = ''; }).api_history(x.id);
+}
+
+function ans(k, v) {
+  answers[k] = v;
+  document.querySelectorAll('button[data-k="' + k + '"]').forEach(b => b.classList.toggle('on', b.classList.contains(v === 'P' ? 'p' : 'f')));
+}
+
+$('photoIn').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const img = new Image(), url = URL.createObjectURL(f);
+  img.onload = () => {
+    const s = Math.min(1, 1024 / Math.max(img.width, img.height));
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(img.width * s); cv.height = Math.round(img.height * s);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    photo = cv.toDataURL('image/jpeg', 0.7);
+    $('prev').src = photo; $('prev').classList.remove('hide'); URL.revokeObjectURL(url);
+  };
+  img.src = url;
+});
+
+function save() {
+  if (ITEMS.some(([k]) => !answers[k])) { $('fMsg').innerHTML = '<div class="msg err">กรุณาตรวจให้ครบทุกข้อ</div>'; return; }
+  if (isCO2(cur) && !$('weight').value.trim()) { $('fMsg').innerHTML = '<div class="msg err">กรุณากรอกน้ำหนักที่ชั่งได้</div>'; return; }
+  $('saveBtn').disabled = true; $('saveBtn').textContent = 'กำลังบันทึก...';
+  google.script.run.withSuccessHandler(r => {
+    $('fMsg').innerHTML = '<div class="msg ' + (r.pass ? 'good' : 'err') + '">' +
+      (r.pass ? 'บันทึกแล้ว: ผ่านทุกข้อ ตรวจครั้งถัดไป ' + esc(r.next) : 'บันทึกแล้ว: มีข้อไม่ผ่าน ระบบแจ้งแอดมินทางอีเมลแล้ว') + '</div>';
+    $('saveBtn').textContent = 'บันทึกแล้ว';
+  }).withFailureHandler(e => {
+    $('fMsg').innerHTML = '<div class="msg err">' + esc(e.message) + '</div>';
+    $('saveBtn').disabled = false; $('saveBtn').textContent = 'บันทึกผลตรวจ';
+  }).api_submit({id: cur.id, items: answers, photo: photo, remark: $('remark').value, weight: $('weight').value});
+}
+
+/* ----- แอดมิน: เพิ่ม/แก้ไขถัง ----- */
+function openAdmin(id) {
+  const x = id ? DATA.list.find(e => e.id === id) : null;
+  editing = x ? x.id : null;
+  $('aTitle').textContent = x ? 'แก้ไขถัง ' + x.id : 'เพิ่มถังใหม่';
+  $('aId').value = x ? x.id : ''; $('aId').disabled = false;
+  $('aType').value = x ? x.type : ''; $('aSize').value = x ? x.size : '';
+  $('aLoc').value = x ? x.location : ''; $('aDate').value = x ? x.installed : '';
+  $('aMsg').innerHTML = x ? '<p class="meta">ถ้าเปลี่ยนรหัส ประวัติการตรวจจะย้ายตามรหัสใหม่ แต่ QR เดิมจะใช้ไม่ได้ ต้องพิมพ์ใหม่</p>' : ''; $('aBtn').disabled = false;
+  armed = false; $('aDel').disabled = false; $('aDel').textContent = 'ลบถังนี้'; $('aDel').classList.remove('arm'); $('aDel').classList.toggle('hide', !x);
+  $('aList').innerHTML = (x ? '<button class="row" onclick="openAdmin(null)"><b>+ เพิ่มถังใหม่</b></button>' : '') +
+    DATA.list.map(e => '<button class="row" onclick="openAdmin(\'' + esc(e.id) + '\')"><span><b>' + esc(e.id) + '</b> ' +
+      esc(e.type) + '<small>' + esc(e.location) + '</small></span></button>').join('');
+  show('admin', 'จัดการถัง');
+}
+
+function saveExt() {
+  $('aBtn').disabled = true;
+  google.script.run.withSuccessHandler(r => {
+    google.script.run.withSuccessHandler(d => {
+      DATA = d; openAdmin(null);
+      $('aMsg').innerHTML = '<div class="msg good">' + (r.created ? 'เพิ่มถังแล้ว' : r.renamed ? 'เปลี่ยนรหัสและแก้ไขข้อมูลแล้ว' : 'แก้ไขข้อมูลแล้ว') + '</div>';
+    }).api_getData();
+  }).withFailureHandler(e => {
+    $('aMsg').innerHTML = '<div class="msg err">' + esc(e.message) + '</div>'; $('aBtn').disabled = false;
+  }).api_saveExtinguisher({oldId: editing || '', id: $('aId').value, type: $('aType').value, size: $('aSize').value,
+    location: $('aLoc').value, installed: $('aDate').value});
+}
+
+let armed = false, armTimer = null;
+function delExt() {
+  if (!editing) return;
+  const b = $('aDel');
+  if (!armed) {   // กดครั้งแรก: ขอยืนยัน (หมดเวลาใน 6 วินาที)
+    armed = true; b.classList.add('arm'); b.textContent = 'กดอีกครั้งเพื่อยืนยันลบ ' + editing;
+    clearTimeout(armTimer);
+    armTimer = setTimeout(() => { armed = false; b.classList.remove('arm'); b.textContent = 'ลบถังนี้'; }, 6000);
+    $('aMsg').innerHTML = '<div class="msg err">ลบแล้วถังจะหายจากรายการ และ QR ของถังนี้ใช้ไม่ได้ ประวัติการตรวจในชีตยังอยู่</div>';
+    return;
+  }
+  clearTimeout(armTimer); b.disabled = true;
+  google.script.run.withSuccessHandler(r => {
+    google.script.run.withSuccessHandler(d => {
+      DATA = d; openAdmin(null);
+      $('aMsg').innerHTML = '<div class="msg good">ลบถัง ' + esc(r.deleted) + ' แล้ว</div>';
+    }).api_getData();
+  }).withFailureHandler(e => {
+    $('aMsg').innerHTML = '<div class="msg err">' + esc(e.message) + '</div>'; b.disabled = false;
+    armed = false; b.classList.remove('arm'); b.textContent = 'ลบถังนี้';
+  }).api_deleteExtinguisher(editing);
+}
+
+/* ----- พิมพ์ QR ----- */
+function openQR() {
+  show('qr', 'พิมพ์ QR');
+  $('labels').innerHTML = ''; $('qrMsg').innerHTML = '';
+  if (!DATA.appUrl) { $('qrMsg').innerHTML = '<div class="msg err">ยังไม่พบลิงก์เว็บแอป ต้อง Deploy เป็นเว็บแอปก่อน</div>'; return; }
+  if (typeof QRCode === 'undefined') { $('qrMsg').innerHTML = '<div class="msg err">โหลดตัวสร้าง QR ไม่สำเร็จ ตรวจอินเทอร์เน็ตแล้วลองใหม่</div>'; return; }
+  if (!DATA.list.length) { $('qrMsg').innerHTML = '<div class="msg err">ยังไม่มีถังให้พิมพ์ QR</div>'; return; }
+  DATA.list.forEach(x => {
+    const d = document.createElement('div'); d.className = 'lab';
+    d.innerHTML = '<div class="qr"></div><b>' + esc(x.id) + '</b><small>' + esc(x.location) + '</small>';
+    $('labels').appendChild(d);
+    new QRCode(d.querySelector('.qr'), {text: DATA.appUrl + '?id=' + encodeURIComponent(x.id), width: 140, height: 140, correctLevel: QRCode.CorrectLevel.M});
+  });
+}
+
+load();
+</script>
+</body>
+</html>
