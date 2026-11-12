@@ -171,20 +171,30 @@ function gasRequest(action, fields = {}) {
       window.removeEventListener('message', onMessage);
       frame.remove();
     };
+ 
+const onMessage = event => {
+  console.log('[FE-Check] Message received:', {
+    origin: event.origin,
+    data: event.data
+  });
 
-    const onMessage = event => {
-      const result = event.data;
+  const result = event.data;
 
-      if (!result || result.requestId !== requestId) return;
+  if (!result || result.requestId !== requestId) {
+    console.log('[FE-Check] Request ID ไม่ตรงกัน');
+    return;
+  }
 
-      cleanup();
+  cleanup();
 
-      if (!result.ok) {
-        reject(new Error(result.error || 'Apps Script ทำงานไม่สำเร็จ'));
-      } else {
-        resolve(result.data);
-      }
-    };
+  if (!result.ok) {
+    console.error('[FE-Check] Apps Script error:', result.error);
+    reject(new Error(result.error || 'Apps Script ทำงานไม่สำเร็จ'));
+  } else {
+    console.log('[FE-Check] โหลดข้อมูลสำเร็จ');
+    resolve(result.data);
+  }
+};
 
     const timer = setTimeout(() => {
       cleanup();
